@@ -1,0 +1,79 @@
+# Cellular automata rule configuration
+
+composite_policy:
+  name: full_composite
+  description: "Free-space attraction + conflict repulsion + alternating-axis + boundary guard"
+  enabled_rules:
+    - free_space_attraction
+    - conflict_repulsion
+    - connectivity_preservation
+    - boundary_guard
+    - alternating_axis_schedule
+    - shrink_adaptation
+    - stabilization
+
+rules:
+  free_space_attraction:
+    weight: 1.0
+    free_space_threshold: 0.3
+    pressure_increment: 0.15
+
+  conflict_repulsion:
+    weight: 1.0
+    conflict_threshold: 0.5
+    repulsion_strength: 0.20
+
+  connectivity_preservation:
+    weight: 0.7
+    coupling_radius: 2
+    bias_strength: 0.10
+
+  boundary_guard:
+    weight: 1.0
+    guard_margin: 1         # cells from boundary
+
+  alternating_axis_schedule:
+    weight: 1.0
+    x_epochs: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]
+    y_epochs: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19]
+
+  shrink_adaptation:
+    weight: 0.8
+    min_shrink: 0.80
+    max_shrink: 0.99
+    congestion_scale: 0.10
+
+  stabilization:
+    weight: 1.0
+    stable_threshold: 0.005
+    min_active_fraction: 0.02
+
+ablations:
+  backend_only:
+    enabled_rules: []
+
+  simple_directional:
+    enabled_rules:
+      - free_space_attraction
+
+  free_space_repulsion:
+    enabled_rules:
+      - free_space_attraction
+      - conflict_repulsion
+
+  full_composite:
+    enabled_rules:
+      - free_space_attraction
+      - conflict_repulsion
+      - connectivity_preservation
+      - boundary_guard
+      - alternating_axis_schedule
+      - shrink_adaptation
+      - stabilization
+
+  adaptive_shrink:
+    enabled_rules:
+      - free_space_attraction
+      - conflict_repulsion
+      - shrink_adaptation
+      - alternating_axis_schedule

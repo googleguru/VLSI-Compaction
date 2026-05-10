@@ -1,0 +1,56 @@
+# Benchmark configuration
+# Prerequisites are marked; missing collateral triggers skip logic.
+
+benchmarks:
+  demo_simple:
+    path: data/demo/demo_simple.cif
+    type: demo
+    description: "Synthetic 5-cell demo layout"
+    available: true
+    skip_reason: null
+
+  demo_complex:
+    path: data/demo/demo_complex.cif
+    type: demo
+    description: "Synthetic 20-cell demo layout with routing"
+    available: true
+    skip_reason: null
+
+  ipsd_c17:
+    path: data/benchmarks/ipsd/c17.cif
+    type: ipsd
+    description: "IPSD c17 (17-gate ISCAS-85)"
+    available: false
+    skip_reason: >
+      IPSD layout-ready CIF not publicly distributed. Provide c17.cif under
+      data/benchmarks/ipsd/ to enable this benchmark. The pipeline, adapter,
+      and metric hooks are fully implemented and will run automatically once
+      the file is present.
+
+  ipsd_c432:
+    path: data/benchmarks/ipsd/c432.cif
+    type: ipsd
+    description: "IPSD c432"
+    available: false
+    skip_reason: >
+      Same prerequisite as ipsd_c17. Place c432.cif in data/benchmarks/ipsd/.
+
+  iscas85_c17:
+    path: data/benchmarks/iscas/c17_layout.cif
+    type: iscas
+    description: "ISCAS-85 c17 converted to CIF layout"
+    available: false
+    skip_reason: >
+      ISCAS-85 netlists require a full synthesis + P&R flow to produce
+      layout-ready CIF. Run scripts/convert_inputs.sh after providing a
+      placed DEF or GDS view under data/benchmarks/iscas/.
+
+  asap7_inv_chain:
+    path: data/benchmarks/asap7/inv_chain.cif
+    type: asap7
+    description: "ASAP7 inverter chain (extracted from PDK cell views)"
+    available: false
+    skip_reason: >
+      ASAP7 7nm PDK cell views are available under academic license from
+      https://github.com/The-OpenROAD-Project/asap7. After obtaining the PDK,
+      run scripts/convert_inputs.sh to extract and convert CIF views.

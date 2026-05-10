@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  compaction:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: vlsi-ca-compaction:latest
+    container_name: ca_compaction
+    volumes:
+      - ../data:/app/data:ro
+      - ../outputs:/app/outputs
+      - ../vendor:/app/vendor:ro
+      - ../configs:/app/configs:ro
+    environment:
+      - PYTHONPATH=/app
+      - EXPERIMENT_NAME=${EXPERIMENT_NAME:-demo}
+      - CA_CONFIG=${CA_CONFIG:-configs/ca_rules.yaml}
+    command: full-run
+    restart: "no"
+
+  baseline:
+    extends:
+      service: compaction
+    command: baseline
+
+  ablation:
+    extends:
+      service: compaction
+    command: ablation
+
+  report:
+    extends:
+      service: compaction
+    command: report

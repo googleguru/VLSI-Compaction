@@ -1,0 +1,38 @@
+# Default experiment configuration
+
+experiment:
+  name: demo
+  seed: 42
+  output_dir: outputs
+
+backend:
+  perl_script: vendor/cellCompaction.pl
+  default_iter: 5
+  default_xshrf: 0.9
+  default_yshrf: 0.9
+  timeout_seconds: 300
+
+ca:
+  grid_resolution: 10        # grid units per layout unit
+  neighborhood: moore        # moore | vonneumann
+  max_epochs: 20
+  convergence_threshold: 0.01
+  rules_config: configs/ca_rules.yaml
+
+geometry:
+  overlap_tolerance: 0
+  spacing_lambda: 1          # design rule spacing in lambda
+
+benchmarks:
+  config: configs/benchmarks.yaml
+
+viz:
+  dpi: 150
+  figure_format: png
+  font_size: 10
+  line_width: 1.0
+  white_background: true
+
+report:
+  auto_update_readme: true
+  embed_figures: true

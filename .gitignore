@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Pytest
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+outputs/logs/*.log
+
+# Large generated files that should be re-run locally
+# (keep figures and tables for publication reference)
+outputs/compacted_layouts/*.cif
+
+# Vendor — do not accidentally commit upstream Perl script
+# (must be cloned separately per UPSTREAM_LICENSE)
+vendor/cellCompaction.pl

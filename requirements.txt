@@ -1,0 +1,11 @@
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+pyyaml>=6.0
+pandas>=2.0
+shapely>=2.0
+tqdm>=4.65
+click>=8.1
+rich>=13.0
+networkx>=3.1
+Pillow>=10.0

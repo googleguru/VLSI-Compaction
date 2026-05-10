@@ -1,0 +1,24 @@
+This repository wraps the Cell-Based-Layout-Compaction engine originally authored by:
+
+  Ameer M.S. Abdelhadi
+  https://github.com/AmeerAbdelhadi/Cell-Based-Layout-Compaction
+
+The upstream Perl compaction script (vendor/cellCompaction.pl) retains its original
+copyright and license notice as distributed by the author. No modifications are made
+to the upstream source code. The script is invoked unmodified via subprocess.
+
+This wrapper framework (src/, scripts/, docker/, configs/, data/demo/) is independent
+original work and is not derived from the upstream source.
+
+---
+
+Upstream repository: https://github.com/AmeerAbdelhadi/Cell-Based-Layout-Compaction
+
+Please refer to the upstream repository for the exact license terms applicable to
+cellCompaction.pl. Common academic/research redistribution terms typically require:
+  - Preserving the author's name and copyright notice
+  - Attribution in publications that use the tool
+  - Not misrepresenting the origin of the software
+
+If you redistribute this framework with vendor/cellCompaction.pl included, ensure
+compliance with the upstream license terms.

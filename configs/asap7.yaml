@@ -1,0 +1,28 @@
+# ASAP7 technology hooks
+# Populate paths after obtaining the ASAP7 PDK (academic license required)
+
+asap7:
+  pdk_root: null              # e.g. /tools/asap7/asap7sc7p5t_28
+  available: false
+  skip_reason: >
+    ASAP7 PDK not found at pdk_root. Obtain from
+    https://github.com/The-OpenROAD-Project/asap7 (academic license) and
+    set pdk_root in this config.
+
+  tech_lambda_nm: 7.5         # lambda = contacted poly pitch / 2
+  grid_unit_nm: 1
+  layer_map:
+    poly: M0
+    metal1: M1
+    metal2: M2
+    via12: VIA1
+
+  cell_views:
+    inv_x1: cells/asap7sc7p5t_INVBUF_RVT_INV_x1.cif
+    inv_x2: cells/asap7sc7p5t_INVBUF_RVT_INV_x2.cif
+    nand2_x1: cells/asap7sc7p5t_OA_RVT_NAND2_x1.cif
+
+  drc_rules:
+    min_poly_space: 2
+    min_metal1_space: 2
+    min_via_enclosure: 1

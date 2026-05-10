@@ -1,0 +1,7 @@
+benchmark,policy,area_before,area_after,area_reduction_pct,width_before,width_after,width_reduction_pct,height_before,height_after,height_reduction_pct,overlap_count_before,overlap_count_after,spacing_violations,runtime_seconds,iterations,xshrf,yshrf,ca_epochs,ca_converged,backend_ok,skip_reason,notes
+ipsd_c17,baseline,0,0,0.0,0,0,0.0,0,0,0.0,0,0,0,0.0,0,0.0,0.0,0,False,False,IPSD layout-ready CIF not publicly distributed. Provide c17.cif under data/benchmarks/ipsd/ to enable this benchmark. Th,SKIPPED
+ipsd_c432,baseline,0,0,0.0,0,0,0.0,0,0,0.0,0,0,0,0.0,0,0.0,0.0,0,False,False,Same prerequisite as ipsd_c17. Place c432.cif in data/benchmarks/ipsd/.,SKIPPED
+iscas85_c17,baseline,0,0,0.0,0,0,0.0,0,0,0.0,0,0,0,0.0,0,0.0,0.0,0,False,False,ISCAS-85 netlists require a full synthesis + P&R flow to produce layout-ready CIF. Run scripts/convert_inputs.sh after p,SKIPPED
+asap7_inv_chain,baseline,0,0,0.0,0,0,0.0,0,0,0.0,0,0,0,0.0,0,0.0,0.0,0,False,False,ASAP7 7nm PDK cell views are available under academic license from https://github.com/The-OpenROAD-Project/asap7. After ,SKIPPED
+demo_simple,baseline,0,0,0.0,0,0,0.0,0,0,0.0,0,0,0,0.0,0,0.0,0.0,0,False,False,,backend failed: cellCompaction.pl not found. Populate vendor/ with the upstream Perl script.
+demo_complex,baseline,0,0,0.0,0,0,0.0,0,0,0.0,0,0,0,0.0,0,0.0,0.0,0,False,False,,backend failed: cellCompaction.pl not found. Populate vendor/ with the upstream Perl script.
