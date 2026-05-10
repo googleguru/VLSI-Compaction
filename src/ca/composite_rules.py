@@ -31,6 +31,8 @@ def build_scheduler(
     """
     rules_cfg = ca_config.get("rules", {})
 
+    policy_nb = neighborhood  # caller default
+
     if policy_name == "full_composite" or policy_name == "default":
         enabled = ca_config.get("composite_policy", {}).get("enabled_rules", [])
     else:
@@ -42,16 +44,22 @@ def build_scheduler(
             )
             enabled = ca_config.get("composite_policy", {}).get("enabled_rules", [])
         else:
-            enabled = ablations[policy_name].get("enabled_rules", [])
+            policy_spec = ablations[policy_name]
+            enabled     = policy_spec.get("enabled_rules", [])
+            # Per-policy neighborhood override (e.g. vonneumann_composite)
+            policy_nb   = policy_spec.get("neighborhood", neighborhood)
 
-    logger.info("Building scheduler: policy=%s, rules=%s", policy_name, enabled)
+    logger.info(
+        "Building scheduler: policy=%s neighborhood=%s rules=%s",
+        policy_name, policy_nb, enabled,
+    )
 
     return EpochScheduler(
         rules_config=rules_cfg,
         enabled_rules=enabled,
         max_epochs=max_epochs,
         convergence_threshold=convergence_threshold,
-        neighborhood=neighborhood,
+        neighborhood=policy_nb,
     )
 
 

@@ -50,17 +50,17 @@ def plot_layout(
 
     layer_patches: Dict[str, mpatches.Patch] = {}
 
-    for sym in layout.symbols.values():
-        for call in sym.calls:
-            child = layout.symbols.get(call.symbol_num)
-            if child:
-                _draw_symbol(ax, child, call.tx, call.ty, layer_patches)
-        _draw_symbol(ax, sym, 0, 0, layer_patches)
-
-    for call in layout.top_calls:
-        sym = layout.symbols.get(call.symbol_num)
-        if sym:
-            _draw_symbol(ax, sym, call.tx, call.ty, layer_patches)
+    # Mirror the same traversal logic as _collect_all_geometry:
+    # use top_calls when present (they carry the authoritative placement),
+    # otherwise fall back to drawing each symbol definition at origin.
+    if layout.top_calls:
+        for call in layout.top_calls:
+            sym = layout.symbols.get(call.symbol_num)
+            if sym:
+                _draw_symbol(ax, sym, call.tx, call.ty, layer_patches)
+    else:
+        for sym in layout.symbols.values():
+            _draw_symbol(ax, sym, 0, 0, layer_patches)
 
     ax.set_aspect("equal")
     ax.autoscale_view()

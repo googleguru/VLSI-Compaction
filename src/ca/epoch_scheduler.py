@@ -107,6 +107,8 @@ class EpochScheduler:
                 logger.warning("Unknown rule: %s", rule_name)
                 continue
             rule_cfg = dict(self.rules_config.get(rule_name, {}))
+            # Inject neighborhood so every rule uses the configured topology
+            rule_cfg["neighborhood"] = self.neighborhood
             if rule_name == "stabilization" and prev_state is not None:
                 rule_cfg["prev_state"] = prev_state
             new_state = fn(new_state, epoch, rule_cfg)

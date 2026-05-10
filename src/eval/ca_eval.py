@@ -17,7 +17,7 @@ from ..planning.shrink_factor_planner import plan_shrink_factors
 from ..planning.iteration_scheduler import plan_iterations
 from ..backend.perl_wrapper import PerlCompactionWrapper, CompactionRequest
 from ..geometry.spatial_metrics import summarize_reduction
-from ..geometry.overlap_estimator import count_bbox_overlaps
+from ..geometry.overlap_estimator import count_bbox_overlaps, spacing_violations
 from .metrics_reporter import CompactionMetrics, write_csv, write_markdown_table
 
 logger = logging.getLogger(__name__)
@@ -113,6 +113,10 @@ def run_ca_eval(
                 height_reduction_pct  = reduction["height_reduction_pct"],
                 overlap_count_before  = count_bbox_overlaps(bboxes_before),
                 overlap_count_after   = count_bbox_overlaps(bboxes_after),
+                spacing_violations    = spacing_violations(
+                    bboxes_after,
+                    config.get("geometry", {}).get("spacing_lambda", 1),
+                ),
                 runtime_seconds       = result.metadata.runtime_seconds,
                 iterations            = n_iters,
                 xshrf                 = xshrf,

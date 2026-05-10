@@ -13,7 +13,7 @@ from ..io.benchmark_manifest import BenchmarkManifest
 from ..io.cif_reader import CIFReader
 from ..backend.perl_wrapper import PerlCompactionWrapper, CompactionRequest
 from ..geometry.spatial_metrics import summarize_reduction
-from ..geometry.overlap_estimator import count_bbox_overlaps
+from ..geometry.overlap_estimator import count_bbox_overlaps, spacing_violations
 from .metrics_reporter import CompactionMetrics, write_csv, write_markdown_table
 
 logger = logging.getLogger(__name__)
@@ -85,6 +85,10 @@ def run_baseline(
                 height_reduction_pct  = reduction["height_reduction_pct"],
                 overlap_count_before  = count_bbox_overlaps(bboxes_before),
                 overlap_count_after   = count_bbox_overlaps(bboxes_after),
+                spacing_violations    = spacing_violations(
+                    bboxes_after,
+                    config.get("geometry", {}).get("spacing_lambda", 1),
+                ),
                 runtime_seconds       = result.metadata.runtime_seconds,
                 iterations            = default_iter,
                 xshrf                 = default_xs,

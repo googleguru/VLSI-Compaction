@@ -1,6 +1,9 @@
 """
 CA rule engine: applies individual rules to evolve the state tensor.
-Rules modify pressure, mobility, and eligibility fields in-place.
+
+All rule functions accept a `neighborhood` key in `cfg` (default "moore")
+so the epoch scheduler can switch between Moore (8-connected) and von Neumann
+(4-connected) topologies without changing rule logic.
 """
 
 import numpy as np
@@ -12,8 +15,7 @@ from .state_encoder import (
     F_FREESPACE, F_MOBILITY, F_ELIGIBLE, N_FIELDS,
 )
 from .neighborhood import (
-    compute_free_space_map, compute_conflict_map,
-    neighborhood_free_space_gradient,
+    compute_free_space_map, compute_conflict_map, smooth_field,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,29 +28,29 @@ def rule_free_space_attraction(
 ) -> np.ndarray:
     """
     Increase pressure toward directions with more free space.
-    Only applied to OCCUPIED and eligible cells.
+    Uses the neighborhood topology from cfg["neighborhood"] to compute
+    the free-space density map, then derives a gradient via finite differences.
     """
     threshold = cfg.get("free_space_threshold", 0.3)
     inc       = cfg.get("pressure_increment",   0.15)
+    nb        = cfg.get("neighborhood", "moore")
 
-    fs_map = compute_free_space_map(state)
-    rows, cols = state.shape[:2]
+    fs_map    = compute_free_space_map(state, neighborhood=nb)
     new_state = state.copy()
+    eligible  = (state[:, :, F_ELIGIBLE] > 0.5) & (state[:, :, F_OCCUPANCY] == 1)
 
-    eligible = (state[:, :, F_ELIGIBLE] > 0.5) & (state[:, :, F_OCCUPANCY] == 1)
-
-    # Vectorized gradient using np.roll (periodic, then mask border)
+    # Vectorized gradient: forward/backward finite differences
     fs_right = np.roll(fs_map, -1, axis=1)
     fs_left  = np.roll(fs_map,  1, axis=1)
     fs_up    = np.roll(fs_map, -1, axis=0)
     fs_down  = np.roll(fs_map,  1, axis=0)
 
-    dx = (fs_right - fs_left)
-    dy = (fs_up    - fs_down)
+    dx = fs_right - fs_left
+    dy = fs_up    - fs_down
 
-    # Zero out at borders
-    dx[:, 0]  = 0; dx[:, -1] = 0
-    dy[0, :]  = 0; dy[-1, :] = 0
+    # Zero out wrap-around border artefacts
+    dx[:, 0]  = 0.0;  dx[:, -1] = 0.0
+    dy[0, :]  = 0.0;  dy[-1, :] = 0.0
 
     mask = eligible & (fs_map > threshold)
     new_state[mask, F_XPRESSURE] = np.clip(
@@ -65,17 +67,19 @@ def rule_conflict_repulsion(
 ) -> np.ndarray:
     """
     Reduce movement pressure when local conflict density is high.
+    Conflict density is measured using the configured neighborhood topology.
     """
     threshold = cfg.get("conflict_threshold",  0.5)
     strength  = cfg.get("repulsion_strength",  0.20)
+    nb        = cfg.get("neighborhood", "moore")
 
-    conflict_map = compute_conflict_map(state)
-    new_state = state.copy()
+    conflict_map = compute_conflict_map(state, neighborhood=nb)
+    new_state    = state.copy()
 
     high_conflict = conflict_map > threshold
-    occ = state[:, :, F_OCCUPANCY] == 1
+    occ           = state[:, :, F_OCCUPANCY] == 1
+    mask          = high_conflict & occ
 
-    mask = high_conflict & occ
     new_state[mask, F_XPRESSURE] = np.clip(
         state[mask, F_XPRESSURE] * (1.0 - strength), -1.0, 1.0
     )
@@ -91,17 +95,18 @@ def rule_connectivity_preservation(
 ) -> np.ndarray:
     """
     Cells with occupied neighbors receive a directional bias aligned with
-    the average neighbor pressure to reduce fragmentation.
+    the neighborhood-average pressure to reduce topological fragmentation.
+    Smoothing uses the configured neighborhood kernel.
     """
     bias = cfg.get("bias_strength", 0.10)
-    from scipy.ndimage import uniform_filter
+    nb   = cfg.get("neighborhood", "moore")
 
     xp = state[:, :, F_XPRESSURE]
     yp = state[:, :, F_YPRESSURE]
     occ = state[:, :, F_OCCUPANCY] == 1
 
-    mean_xp = uniform_filter(xp, size=3, mode='constant', cval=0.0)
-    mean_yp = uniform_filter(yp, size=3, mode='constant', cval=0.0)
+    mean_xp = smooth_field(xp, neighborhood=nb)
+    mean_yp = smooth_field(yp, neighborhood=nb)
 
     new_state = state.copy()
     new_state[occ, F_XPRESSURE] = np.clip(
@@ -117,25 +122,26 @@ def rule_boundary_guard(
     state: np.ndarray, epoch: int, cfg: Dict[str, Any]
 ) -> np.ndarray:
     """
-    Cells near the boundary have their pressure zeroed on the boundary-facing axis.
+    Zero out boundary-facing pressure components within `guard_margin` cells
+    of the layout outline. Topology-independent.
     """
     margin = cfg.get("guard_margin", 1)
     rows, cols = state.shape[:2]
     new_state = state.copy()
 
-    # Left boundary guard: zero x-pressure for leftward motion
+    # Left: disallow leftward motion (xp < 0)
     new_state[:, :margin, F_XPRESSURE] = np.maximum(
         state[:, :margin, F_XPRESSURE], 0.0
     )
-    # Right boundary guard
+    # Right: disallow rightward motion (xp > 0)
     new_state[:, cols - margin:, F_XPRESSURE] = np.minimum(
         state[:, cols - margin:, F_XPRESSURE], 0.0
     )
-    # Bottom boundary guard
+    # Bottom: disallow downward motion (yp < 0)
     new_state[:margin, :, F_YPRESSURE] = np.maximum(
         state[:margin, :, F_YPRESSURE], 0.0
     )
-    # Top boundary guard
+    # Top: disallow upward motion (yp > 0)
     new_state[rows - margin:, :, F_YPRESSURE] = np.minimum(
         state[rows - margin:, :, F_YPRESSURE], 0.0
     )
@@ -147,17 +153,16 @@ def rule_alternating_axis_schedule(
 ) -> np.ndarray:
     """
     On even epochs emphasize X-axis pressure; on odd epochs emphasize Y-axis.
-    Matches the backend's alternating X/Y compaction iterations.
+    Matches the backend's alternating horizontal/vertical compaction style.
+    Topology-independent.
     """
     x_epochs = set(cfg.get("x_epochs", list(range(0, 20, 2))))
     y_epochs = set(cfg.get("y_epochs", list(range(1, 20, 2))))
     new_state = state.copy()
 
     if epoch in x_epochs:
-        # Suppress Y pressure this epoch
         new_state[:, :, F_YPRESSURE] *= 0.5
     elif epoch in y_epochs:
-        # Suppress X pressure this epoch
         new_state[:, :, F_XPRESSURE] *= 0.5
 
     return new_state
@@ -167,11 +172,11 @@ def rule_shrink_adaptation(
     state: np.ndarray, epoch: int, cfg: Dict[str, Any]
 ) -> np.ndarray:
     """
-    No-op on state tensor; shrink factor suggestions are extracted by the
-    epoch scheduler from the aggregate pressure fields. This rule stores
-    a per-cell congestion signal used by the scheduler.
+    Stores per-cell conflict density in F_CONFLICT for use by the epoch
+    scheduler's shrink-factor derivation. Uses the neighborhood kernel.
     """
-    conflict_map = compute_conflict_map(state)
+    nb = cfg.get("neighborhood", "moore")
+    conflict_map = compute_conflict_map(state, neighborhood=nb)
     new_state = state.copy()
     new_state[:, :, F_CONFLICT] = conflict_map
     return new_state
@@ -181,9 +186,9 @@ def rule_stabilization(
     state: np.ndarray, epoch: int, cfg: Dict[str, Any]
 ) -> np.ndarray:
     """
-    Mark cells as ineligible if their pressure has converged
-    (change below threshold vs. a stored previous state).
-    Requires 'prev_state' in cfg.
+    Mark cells as ineligible when their (xp, yp) change vs the previous epoch
+    falls below `stable_threshold`. Reduces oscillation in converged regions.
+    Topology-independent.
     """
     threshold = cfg.get("stable_threshold", 0.005)
     prev = cfg.get("prev_state")
@@ -191,10 +196,10 @@ def rule_stabilization(
         return state
 
     new_state = state.copy()
-    delta_xp = np.abs(state[:, :, F_XPRESSURE] - prev[:, :, F_XPRESSURE])
-    delta_yp = np.abs(state[:, :, F_YPRESSURE] - prev[:, :, F_YPRESSURE])
+    delta_xp  = np.abs(state[:, :, F_XPRESSURE] - prev[:, :, F_XPRESSURE])
+    delta_yp  = np.abs(state[:, :, F_YPRESSURE] - prev[:, :, F_YPRESSURE])
     converged = (delta_xp < threshold) & (delta_yp < threshold)
-    occ = state[:, :, F_OCCUPANCY] == 1
+    occ       = state[:, :, F_OCCUPANCY] == 1
     new_state[occ & converged, F_ELIGIBLE] = 0.0
     return new_state
 

@@ -77,3 +77,17 @@ ablations:
       - conflict_repulsion
       - shrink_adaptation
       - alternating_axis_schedule
+
+  # Neighborhood topology comparison: same rules as full_composite but
+  # run with von Neumann (4-connected) kernel instead of Moore (8-connected).
+  # The ablation_runner overrides `neighborhood` when executing this policy.
+  vonneumann_composite:
+    neighborhood: vonneumann
+    enabled_rules:
+      - free_space_attraction
+      - conflict_repulsion
+      - connectivity_preservation
+      - boundary_guard
+      - alternating_axis_schedule
+      - shrink_adaptation
+      - stabilization
