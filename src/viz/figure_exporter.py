@@ -1,6 +1,9 @@
 """
 Publication-ready figure exporter.
 Reads evaluation results and CA run data to produce all required figures.
+
+Convergence runs always use convergence_threshold=0.0 and max_epochs=20 so
+every figure shows a full multi-point curve rather than a single dot.
 """
 
 import os
@@ -10,18 +13,20 @@ import logging
 import argparse
 import yaml
 import numpy as np
-from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Dict, Tuple
 
 from ..io.cif_reader import CIFReader
 from ..ca.grid_discretizer import GridDiscretizer
-from ..ca.composite_rules import load_ca_config, build_scheduler
+from ..ca.composite_rules import load_ca_config, build_scheduler, all_policy_names
 from .layout_plotter import plot_before_after
 from .chart_generator import (
     area_reduction_bar,
     width_height_reduction_chart,
-    convergence_curve,
     ablation_comparison_chart,
+    convergence_curve_full,
+    ca_shrink_savings_bar,
+    ca_epoch_profile_bar,
+    policy_comparison_lines,
 )
 from .heatmap_plotter import (
     plot_occupancy_heatmap,
@@ -30,6 +35,16 @@ from .heatmap_plotter import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Policies used for per-benchmark convergence and planning charts.
+# Subset of all ablation policies chosen for readability.
+_VIZ_POLICIES = [
+    "full_composite",
+    "simple_directional",
+    "free_space_repulsion",
+    "adaptive_shrink",
+    "vonneumann_composite",
+]
 
 
 def _load_metrics_from_csv(csv_path: str) -> list:
@@ -62,14 +77,32 @@ _BOOL_FIELDS = {"ca_converged", "backend_ok"}
 
 def _coerce(key, val):
     if key in _FLOAT_FIELDS:
-        try: return float(val)
-        except: return 0.0
+        try:
+            return float(val)
+        except Exception:
+            return 0.0
     if key in _INT_FIELDS:
-        try: return int(val)
-        except: return 0
+        try:
+            return int(val)
+        except Exception:
+            return 0
     if key in _BOOL_FIELDS:
         return str(val).lower() in ("true", "1", "yes")
     return val
+
+
+def _run_ca_full(ca_cfg: dict, grid: np.ndarray, policy: str):
+    """
+    Run a CA visualisation pass with convergence_threshold=0.0 so all
+    max_epochs epochs are always executed and the pressure curves are
+    guaranteed to have multiple data points.
+    """
+    sched = build_scheduler(
+        ca_cfg, policy,
+        max_epochs=20,
+        convergence_threshold=0.0,
+    )
+    return sched.run(grid)
 
 
 def export_all_figures(config: dict, out_dir: str) -> None:
@@ -80,41 +113,41 @@ def export_all_figures(config: dict, out_dir: str) -> None:
 
     dpi = config.get("viz", {}).get("dpi", 150)
 
-    # 1. Load all metrics
+    # ── 1. Load ablation metrics from CSV (if available) ─────────────────────
     all_metrics = []
     for csv_path in glob.glob(os.path.join(tables_dir, "*.csv")):
         all_metrics.extend(_load_metrics_from_csv(csv_path))
 
     if all_metrics:
-        # 2. Area reduction bar
         area_reduction_bar(
             all_metrics,
             out_path=os.path.join(figures_dir, "area_reduction.png"),
             dpi=dpi,
         )
-        # 3. Width/height reduction
         width_height_reduction_chart(
             all_metrics,
             out_path=os.path.join(figures_dir, "width_height_reduction.png"),
             dpi=dpi,
         )
-        # 4. Ablation comparison
         ablation_comparison_chart(
             all_metrics,
             out_path=os.path.join(figures_dir, "ablation_comparison.png"),
             dpi=dpi,
         )
 
-    # 5. Per-benchmark before/after snapshots + occupancy/pressure heatmaps
-    reader       = CIFReader()
-    discretizer  = GridDiscretizer(resolution=config.get("ca", {}).get("grid_resolution", 10))
-
+    # ── 2. Load CA config ─────────────────────────────────────────────────────
     ca_config_path = config.get("ca", {}).get("rules_config", "configs/ca_rules.yaml")
     if os.path.isfile(ca_config_path):
         ca_cfg = load_ca_config(ca_config_path)
     else:
         ca_cfg = {}
 
+    reader      = CIFReader()
+    discretizer = GridDiscretizer(
+        resolution=config.get("ca", {}).get("grid_resolution", 10)
+    )
+
+    # ── 3. Per-benchmark figures ──────────────────────────────────────────────
     for demo_cif in glob.glob("data/demo/*.cif"):
         name = os.path.splitext(os.path.basename(demo_cif))[0]
         compacted_cif = os.path.join(layouts_dir, f"{name}_baseline.cif")
@@ -131,37 +164,108 @@ def export_all_figures(config: dict, out_dir: str) -> None:
         except Exception as exc:
             logger.warning("Occupancy heatmap failed for %s: %s", name, exc)
 
-        # Pressure heatmap + convergence (CA dry-run on demo)
+        if not ca_cfg:
+            continue
+
+        # Re-read layout fresh for CA runs
         try:
             layout = reader.read(demo_cif)
             grid, _ = discretizer.discretize(layout)
-            if ca_cfg:
-                sched = build_scheduler(ca_cfg, "full_composite", max_epochs=10)
-                ca_result = sched.run(grid)
-                if ca_result.epoch_results:
-                    last_ep = ca_result.epoch_results[-1]
-                    plot_pressure_heatmap(
-                        last_ep.state, name, last_ep.epoch,
-                        out_path=os.path.join(figures_dir, f"{name}_pressure.png"),
-                        dpi=dpi,
-                    )
-                xhist, yhist = ca_result.pressure_history()
-                convergence_curve(
-                    xhist, yhist, name, "full_composite",
-                    out_path=os.path.join(figures_dir, f"{name}_convergence.png"),
+        except Exception as exc:
+            logger.warning("Could not read/discretize %s: %s", demo_cif, exc)
+            continue
+
+        # ── 3a. Full-epoch convergence curve for full_composite ──────────────
+        try:
+            ca_result = _run_ca_full(ca_cfg, grid, "full_composite")
+
+            # Pressure heatmap from final epoch
+            if ca_result.epoch_results:
+                last_ep = ca_result.epoch_results[-1]
+                plot_pressure_heatmap(
+                    last_ep.state, name, last_ep.epoch,
+                    out_path=os.path.join(figures_dir, f"{name}_pressure.png"),
                     dpi=dpi,
                 )
-        except Exception as exc:
-            logger.warning("Pressure/convergence figure failed for %s: %s", name, exc)
 
-        # Before/after snapshot if compacted CIF exists
+            # Four-panel convergence figure — guaranteed multi-point curve
+            convergence_curve_full(
+                ca_result.epoch_results,
+                benchmark_name=name,
+                policy="full_composite",
+                out_path=os.path.join(
+                    figures_dir, f"{name}_convergence.png"
+                ),
+                dpi=dpi,
+            )
+        except Exception as exc:
+            logger.warning("Convergence figure failed for %s: %s", name, exc)
+
+        # ── 3b. Run all viz policies; collect planning results ────────────────
+        planning_results: List[dict] = []
+        policy_epoch_data: Dict[str, Tuple[List[float], List[float]]] = {}
+
+        for policy in _VIZ_POLICIES:
+            try:
+                res = _run_ca_full(ca_cfg, grid, policy)
+            except Exception as exc:
+                logger.warning("CA run failed for %s/%s: %s", name, policy, exc)
+                continue
+
+            xp_hist, yp_hist = res.pressure_history()
+            policy_epoch_data[policy] = (xp_hist, yp_hist)
+
+            final_active = (
+                res.epoch_results[-1].active_fraction
+                if res.epoch_results else 1.0
+            )
+            planning_results.append({
+                "benchmark":             name,
+                "policy":                policy,
+                "xshrf":                 res.final_xshrf,
+                "yshrf":                 res.final_yshrf,
+                "ca_epochs":             res.epochs_run,
+                "final_active_fraction": final_active,
+            })
+
+        # ── 3c. CA planning bar charts (always non-zero, no backend needed) ──
+        if planning_results:
+            ca_shrink_savings_bar(
+                planning_results,
+                out_path=os.path.join(
+                    figures_dir, f"{name}_ca_shrink_savings.png"
+                ),
+                dpi=dpi,
+            )
+            ca_epoch_profile_bar(
+                planning_results,
+                out_path=os.path.join(
+                    figures_dir, f"{name}_ca_epoch_profile.png"
+                ),
+                dpi=dpi,
+            )
+
+        # ── 3d. Multi-policy pressure comparison lines ────────────────────────
+        if policy_epoch_data:
+            policy_comparison_lines(
+                policy_epoch_data,
+                benchmark_name=name,
+                out_path=os.path.join(
+                    figures_dir, f"{name}_policy_comparison.png"
+                ),
+                dpi=dpi,
+            )
+
+        # ── 3e. Before/after snapshot if compacted CIF exists ─────────────────
         if os.path.isfile(compacted_cif):
             try:
                 before = reader.read(demo_cif)
                 after  = reader.read(compacted_cif)
                 plot_before_after(
                     before, after, name,
-                    out_path=os.path.join(figures_dir, f"{name}_before_after.png"),
+                    out_path=os.path.join(
+                        figures_dir, f"{name}_before_after.png"
+                    ),
                     dpi=dpi,
                 )
             except Exception as exc:
