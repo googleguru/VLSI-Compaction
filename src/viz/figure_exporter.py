@@ -18,7 +18,8 @@ from typing import List, Dict, Tuple
 from ..io.cif_reader import CIFReader
 from ..ca.grid_discretizer import GridDiscretizer
 from ..ca.composite_rules import load_ca_config, build_scheduler, all_policy_names
-from .layout_plotter import plot_before_after
+from ..ca.rule110_scheduler import Rule110Scheduler
+from .layout_plotter import plot_before_after, plot_layout, plot_magic_layout
 from .chart_generator import (
     area_reduction_bar,
     width_height_reduction_chart,
@@ -28,11 +29,24 @@ from .chart_generator import (
     ca_epoch_profile_bar,
     policy_comparison_lines,
 )
+from .rule110_visualizer import (
+    plot_state_evolution,
+    plot_shrink_trajectory,
+    plot_activity_curve,
+    plot_pressure_evolution,
+    plot_policy_matrix,
+    plot_shrink_comparison,
+    plot_pressure_profiles,
+    plot_r110_dashboard,
+)
 from .heatmap_plotter import (
     plot_occupancy_heatmap,
     plot_pressure_heatmap,
     plot_congestion_heatmap,
 )
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +284,95 @@ def export_all_figures(config: dict, out_dir: str) -> None:
                 )
             except Exception as exc:
                 logger.warning("Before/after snapshot failed for %s: %s", name, exc)
+
+        # ── 3f. Standard layout rendering ────────────────────────────────────
+        try:
+            lay = reader.read(demo_cif)
+            fig, ax = plt.subplots(figsize=(6, 5))
+            fig.patch.set_facecolor("white")
+            plot_layout(lay, title=f"Layout: {name}", ax=ax, tech="scmos")
+            fig.savefig(
+                os.path.join(figures_dir, f"{name}_layout.png"),
+                dpi=dpi, bbox_inches="tight", facecolor="white",
+            )
+            plt.close(fig)
+            logger.info("Standard layout figure: %s", name)
+        except Exception as exc:
+            logger.warning("Standard layout failed for %s: %s", name, exc)
+
+        # ── 3g. Magic-style layout rendering ─────────────────────────────────
+        try:
+            lay = reader.read(demo_cif)
+            plot_magic_layout(
+                lay,
+                title=f"Magic Layout: {name}",
+                tech="scmos",
+                out_path=os.path.join(figures_dir, f"{name}_magic_layout.png"),
+                dpi=dpi,
+            )
+            logger.info("Magic layout figure: %s", name)
+        except Exception as exc:
+            logger.warning("Magic layout failed for %s: %s", name, exc)
+
+        # ── 3h. Congestion heatmap ────────────────────────────────────────────
+        try:
+            plot_congestion_heatmap(
+                grid, name,
+                out_path=os.path.join(figures_dir, f"{name}_congestion.png"),
+                dpi=dpi,
+            )
+        except Exception as exc:
+            logger.warning("Congestion heatmap failed for %s: %s", name, exc)
+
+        # ── 3i. Rule-110 visualizations ───────────────────────────────────────
+        try:
+            r110_sched = Rule110Scheduler(max_epochs=20, mode="alternating",
+                                          damping=0.85)
+            r110_result = r110_sched.run(grid)
+
+            plot_state_evolution(
+                r110_result, name,
+                out_path=os.path.join(figures_dir, f"{name}_r110_evolution.png"),
+                dpi=dpi,
+            )
+            plot_pressure_evolution(
+                r110_result, name,
+                out_path=os.path.join(figures_dir, f"{name}_r110_pressure_evolution.png"),
+                dpi=dpi,
+            )
+            plot_shrink_trajectory(
+                r110_result, name,
+                out_path=os.path.join(figures_dir, f"{name}_r110_shrink.png"),
+                dpi=dpi,
+            )
+            plot_activity_curve(
+                r110_result, name,
+                out_path=os.path.join(figures_dir, f"{name}_r110_activity.png"),
+                dpi=dpi,
+            )
+            plot_pressure_profiles(
+                r110_result, name,
+                out_path=os.path.join(figures_dir, f"{name}_r110_pressure_profiles.png"),
+                dpi=dpi,
+            )
+            plot_r110_dashboard(
+                r110_result, grid, name,
+                out_path=os.path.join(figures_dir, f"{name}_r110_dashboard.png"),
+                dpi=dpi,
+            )
+            plot_policy_matrix(
+                grid, name,
+                out_path=os.path.join(figures_dir, f"{name}_r110_policy_matrix.png"),
+                dpi=dpi,
+            )
+            plot_shrink_comparison(
+                grid, name,
+                out_path=os.path.join(figures_dir, f"{name}_r110_shrink_comparison.png"),
+                dpi=dpi,
+            )
+            logger.info("Rule-110 figures complete: %s", name)
+        except Exception as exc:
+            logger.warning("Rule-110 figures failed for %s: %s", name, exc)
 
     logger.info("Figure export complete. Output: %s", figures_dir)
 
