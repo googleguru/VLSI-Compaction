@@ -1,0 +1,15 @@
+# Yosys synthesis script — generic (no Liberty technology mapping)
+# Usage: yosys -p "$(cat synth_generic.ys)"
+# Variables expanded by YosysRunner before passing to yosys:
+#   ${INPUT_V}   input Verilog file
+#   ${OUTPUT_V}  output gate-level netlist
+#   ${TOP}       top module name (may be empty)
+
+read_verilog ${INPUT_V}
+hierarchy -check ${TOP_FLAG}
+proc
+opt
+techmap
+opt -purge
+stat
+write_verilog -noattr ${OUTPUT_V}

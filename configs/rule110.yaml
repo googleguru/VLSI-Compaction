@@ -1,0 +1,68 @@
+# Rule-110 Cellular Automaton configuration
+#
+# Rule 110 truth table (Wolfram code 110 = 0b01101110):
+#   (1,1,1)->0  (1,1,0)->1  (1,0,1)->1  (1,0,0)->0
+#   (0,1,1)->1  (0,1,0)->1  (0,0,1)->1  (0,0,0)->0
+#
+# 2-D lift: alternating horizontal (row) and vertical (column) passes.
+# Damping prevents oscillation; clamped boundary for geometric stability.
+
+defaults:
+  max_epochs:  20
+  boundary:    clamped     # clamped | periodic
+  damping:     0.85        # blend factor: 1.0 = pure Rule 110, 0 = frozen
+  mode:        alternating # alternating | row_only | col_only
+  min_shrink:  0.80
+  max_shrink:  0.99
+
+ablations:
+  # ── No CA: pure backend compaction ─────────────────────────────────────────
+  backend_only:
+    max_epochs:  0          # scheduler not run; default shrink used
+    mode:        alternating
+    damping:     0.85
+
+  # ── Row-only Rule-110 ───────────────────────────────────────────────────────
+  r110_row_only:
+    max_epochs:  20
+    boundary:    clamped
+    damping:     0.85
+    mode:        row_only
+    min_shrink:  0.82
+    max_shrink:  0.99
+
+  # ── Column-only Rule-110 ────────────────────────────────────────────────────
+  r110_col_only:
+    max_epochs:  20
+    boundary:    clamped
+    damping:     0.85
+    mode:        col_only
+    min_shrink:  0.82
+    max_shrink:  0.99
+
+  # ── Alternating row+column Rule-110 (no adaptive shrink) ───────────────────
+  r110_alternating:
+    max_epochs:  20
+    boundary:    clamped
+    damping:     0.85
+    mode:        alternating
+    min_shrink:  0.80
+    max_shrink:  0.99
+
+  # ── Alternating + adaptive shrink (full Rule-110 policy) ───────────────────
+  r110_alternating_adaptive:
+    max_epochs:  20
+    boundary:    clamped
+    damping:     0.80
+    mode:        alternating
+    min_shrink:  0.75        # allow more aggressive shrink
+    max_shrink:  0.99
+
+  # ── Periodic boundary variant ───────────────────────────────────────────────
+  r110_periodic:
+    max_epochs:  20
+    boundary:    periodic
+    damping:     0.85
+    mode:        alternating
+    min_shrink:  0.80
+    max_shrink:  0.99

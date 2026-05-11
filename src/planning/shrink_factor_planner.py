@@ -1,18 +1,16 @@
 """
-Shrink factor planner: decides Xshrf and Yshrf for each backend iteration
-based on CA pressure signals and layout density.
+Shrink factor planner: derives Xshrf and Yshrf from Rule-110 pressure signals.
 """
 
 import numpy as np
 import logging
 from typing import Tuple
-from ..ca.epoch_scheduler import CARunResult
 
 logger = logging.getLogger(__name__)
 
 
 def plan_shrink_factors(
-    ca_result: CARunResult,
+    run_result,
     occupancy_ratio: float,
     base_xshrf: float = 0.9,
     base_yshrf: float = 0.9,
@@ -20,13 +18,14 @@ def plan_shrink_factors(
     """
     Compute final Xshrf and Yshrf recommendations.
 
-    High occupancy -> conservative shrink (closer to 1.0)
-    Strong CA pressure -> more aggressive shrink in that direction
+    High occupancy → conservative shrink (closer to 1.0)
+    Strong CA pressure → more aggressive shrink in that direction
+
+    Compatible with both Rule110RunResult and legacy CARunResult.
     """
     from .directional_pressure import weighted_shrink
-    ca_xshrf, ca_yshrf = weighted_shrink(ca_result)
+    ca_xshrf, ca_yshrf = weighted_shrink(run_result)
 
-    # Blend CA suggestion with occupancy-based conservatism
     conservatism = float(np.clip(occupancy_ratio, 0.0, 1.0))
     xshrf = ca_xshrf * (1.0 - 0.2 * conservatism) + base_xshrf * 0.2 * conservatism
     yshrf = ca_yshrf * (1.0 - 0.2 * conservatism) + base_yshrf * 0.2 * conservatism

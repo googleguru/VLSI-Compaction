@@ -1,9 +1,13 @@
-.PHONY: build docker-build baseline eval ablation report clean install lint test
+.PHONY: build docker-build synth compact baseline eval ablation report \
+        clean install lint test figures
 
-PYTHON   := python3
-SCRIPTS  := scripts
-CONFIGS  := configs/default.yaml
-OUT      := outputs
+PYTHON      := python3
+SCRIPTS     := scripts
+CONFIG      := configs/default.yaml
+R110_CONFIG := configs/rule110.yaml
+BENCHMARKS  := configs/benchmarks.yaml
+OUT         := outputs
+POLICY      ?= r110_alternating_adaptive
 
 # ── local environment ────────────────────────────────────────────────────────
 
@@ -11,46 +15,66 @@ install:
 	pip install -e . -r requirements.txt
 
 lint:
-	python -m py_compile src/**/*.py scripts/*.py 2>/dev/null || true
+	$(PYTHON) -m py_compile \
+	    src/ca/rule110.py \
+	    src/ca/rule110_scheduler.py \
+	    src/synth/yosys_runner.py \
+	    src/synth/liberty_handler.py \
+	    src/synth/netlist_parser.py \
+	    src/geometry/cell_template_loader.py \
+	    src/geometry/netlist_mapper.py \
+	    src/geometry/synthetic_generator.py \
+	    src/eval/rule110_eval.py \
+	    src/eval/ablation_runner.py \
+	    2>&1 | grep -v '^$$' || true
 
 test:
-	$(PYTHON) -m pytest tests/ -v 2>/dev/null || echo "No tests configured"
+	$(PYTHON) -m pytest tests/ -v
 
 build: install
 
 # ── docker ───────────────────────────────────────────────────────────────────
 
 docker-build:
-	docker compose -f docker/docker-compose.yml build
+	bash $(SCRIPTS)/build_docker.sh
 
-docker-baseline:
-	docker compose -f docker/docker-compose.yml run --rm compaction bash /app/scripts/run_baseline.sh
+docker-synth:
+	docker compose -f docker/docker-compose.yml run --rm compaction synth
+
+docker-compact:
+	docker compose -f docker/docker-compose.yml run --rm compaction compact
 
 docker-ablation:
-	docker compose -f docker/docker-compose.yml run --rm compaction bash /app/scripts/run_ablation.sh
+	docker compose -f docker/docker-compose.yml run --rm compaction ablation
 
 docker-report:
-	docker compose -f docker/docker-compose.yml run --rm compaction bash /app/scripts/make_report.sh
+	docker compose -f docker/docker-compose.yml run --rm compaction report
+
+docker-full:
+	docker compose -f docker/docker-compose.yml run --rm compaction full-run
 
 # ── runs (local) ─────────────────────────────────────────────────────────────
 
-fetch:
-	bash $(SCRIPTS)/fetch_benchmarks.sh
+synth:
+	bash $(SCRIPTS)/run_synth.sh $(CONFIG)
 
-convert:
-	bash $(SCRIPTS)/convert_inputs.sh
+compact:
+	bash $(SCRIPTS)/run_compaction.sh $(POLICY) $(CONFIG)
 
 baseline:
 	bash $(SCRIPTS)/run_baseline.sh
 
-ca-run:
-	bash $(SCRIPTS)/run_ca_compaction.sh
-
 ablation:
-	bash $(SCRIPTS)/run_ablation.sh
+	$(PYTHON) -m src.eval.ablation_runner \
+	    --config $(CONFIG) \
+	    --rule110-config $(R110_CONFIG) \
+	    --benchmarks $(BENCHMARKS) \
+	    --out-dir $(OUT)
 
-eval:
-	$(PYTHON) -m src.eval.ablation_runner --config $(CONFIGS)
+eval: ablation
+
+figures:
+	$(PYTHON) -m src.viz.figure_exporter --config $(CONFIG) --out-dir $(OUT)
 
 report:
 	bash $(SCRIPTS)/make_report.sh
@@ -58,7 +82,8 @@ report:
 # ── cleanup ──────────────────────────────────────────────────────────────────
 
 clean:
-	rm -rf $(OUT)/figures/* $(OUT)/compacted_layouts/* $(OUT)/tables/* \
-	       $(OUT)/logs/* $(OUT)/reports/* __pycache__ src/**/__pycache__ \
-	       *.egg-info dist build
+	rm -rf $(OUT)/figures/* $(OUT)/compacted/* $(OUT)/compacted_layouts/* \
+	       $(OUT)/tables/* $(OUT)/logs/* $(OUT)/reports/* \
+	       $(OUT)/netlists/* $(OUT)/geometry/* \
+	       __pycache__ src/**/__pycache__ *.egg-info dist build
 	find . -name "*.pyc" -delete

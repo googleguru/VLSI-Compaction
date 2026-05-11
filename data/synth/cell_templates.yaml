@@ -1,0 +1,65 @@
+# Standard-cell geometry templates
+#
+# Dimensions are in CIF units (centimicrons; 1 lambda = 100 units).
+# Used by CellTemplateLoader when real PDK layout views are unavailable.
+# These values approximate a generic 0.18 µm / 180 nm cell library.
+# Replace with PDK-accurate values when a real Liberty or GDS source is present.
+
+defaults:
+  height:         400    # standard cell row height (4 lambda)
+  width_per_pin:   80    # incremental width per logic input
+  min_width:      160    # minimum cell width (2 lambda)
+
+cells:
+  # ── Inverters ───────────────────────────────────────────────────────────────
+  INV_X1:   {width:  200, height: 400, layers: [POLY, DIFF]}
+  INV_X2:   {width:  240, height: 400, layers: [POLY, DIFF]}
+  INV_X4:   {width:  320, height: 400, layers: [POLY, DIFF]}
+  NOT:      {width:  200, height: 400, layers: [POLY]}
+
+  # ── 2-input gates ───────────────────────────────────────────────────────────
+  NAND2_X1: {width:  280, height: 400, layers: [POLY, DIFF]}
+  NAND2_X2: {width:  360, height: 400, layers: [POLY, DIFF]}
+  NOR2_X1:  {width:  280, height: 400, layers: [POLY, DIFF]}
+  AND2_X1:  {width:  320, height: 400, layers: [POLY, DIFF]}
+  OR2_X1:   {width:  320, height: 400, layers: [POLY, DIFF]}
+  XOR2_X1:  {width:  400, height: 400, layers: [POLY, DIFF]}
+  XNOR2_X1: {width:  400, height: 400, layers: [POLY, DIFF]}
+  nand:     {width:  280, height: 400, layers: [POLY]}
+  nor:      {width:  280, height: 400, layers: [POLY]}
+
+  # ── 3-input gates ───────────────────────────────────────────────────────────
+  NAND3_X1: {width:  360, height: 400, layers: [POLY, DIFF]}
+  NOR3_X1:  {width:  360, height: 400, layers: [POLY, DIFF]}
+  AND3_X1:  {width:  400, height: 400, layers: [POLY, DIFF]}
+  AOI21_X1: {width:  360, height: 400, layers: [POLY, DIFF]}
+  OAI21_X1: {width:  360, height: 400, layers: [POLY, DIFF]}
+
+  # ── 4-input gates ───────────────────────────────────────────────────────────
+  NAND4_X1: {width:  440, height: 400, layers: [POLY, DIFF]}
+  AOI22_X1: {width:  440, height: 400, layers: [POLY, DIFF]}
+  OAI22_X1: {width:  440, height: 400, layers: [POLY, DIFF]}
+
+  # ── Flip-flops ───────────────────────────────────────────────────────────────
+  DFF_X1:   {width:  600, height: 400, layers: [POLY, DIFF, M1]}
+  DFFR_X1:  {width:  720, height: 400, layers: [POLY, DIFF, M1]}
+  DFFS_X1:  {width:  720, height: 400, layers: [POLY, DIFF, M1]}
+
+  # ── Muxes ────────────────────────────────────────────────────────────────────
+  MUX2_X1:  {width:  480, height: 400, layers: [POLY, DIFF]}
+
+  # ── Buffers ──────────────────────────────────────────────────────────────────
+  BUF_X1:   {width:  240, height: 400, layers: [POLY, DIFF]}
+  BUF_X2:   {width:  320, height: 400, layers: [POLY, DIFF]}
+
+  # ── Yosys internal cell names ─────────────────────────────────────────────
+  $_NOT_:   {width:  200, height: 400, layers: [POLY]}
+  $_AND_:   {width:  320, height: 400, layers: [POLY]}
+  $_OR_:    {width:  320, height: 400, layers: [POLY]}
+  $_XOR_:   {width:  400, height: 400, layers: [POLY]}
+  $_XNOR_:  {width:  400, height: 400, layers: [POLY]}
+  $_NAND_:  {width:  280, height: 400, layers: [POLY]}
+  $_NOR_:   {width:  280, height: 400, layers: [POLY]}
+  $_MUX_:   {width:  480, height: 400, layers: [POLY]}
+  $_DFF_P_: {width:  600, height: 400, layers: [POLY, M1]}
+  $_DFF_N_: {width:  600, height: 400, layers: [POLY, M1]}

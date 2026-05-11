@@ -1,11 +1,11 @@
 version: "3.9"
 
-# Shared service definition via YAML anchor (replaces deprecated `extends`)
+# Shared service definition via YAML anchor
 x-compaction-base: &compaction-base
   build:
     context: ..
     dockerfile: docker/Dockerfile
-  image: vlsi-ca-compaction:latest
+  image: vlsi-rule110-compaction:latest
   volumes:
     - ../data:/app/data:ro
     - ../outputs:/app/outputs
@@ -14,26 +14,38 @@ x-compaction-base: &compaction-base
   environment:
     - PYTHONPATH=/app
     - EXPERIMENT_NAME=${EXPERIMENT_NAME:-demo}
+    - POLICY=${POLICY:-r110_alternating_adaptive}
+    - RULE110_CONFIG=${RULE110_CONFIG:-configs/rule110.yaml}
     - CA_CONFIG=${CA_CONFIG:-configs/ca_rules.yaml}
   restart: "no"
 
 services:
   compaction:
     <<: *compaction-base
-    container_name: ca_compaction
+    container_name: rule110_compaction
     command: full-run
+
+  synth:
+    <<: *compaction-base
+    container_name: rule110_synth
+    command: synth
+
+  compact:
+    <<: *compaction-base
+    container_name: rule110_compact
+    command: compact
 
   baseline:
     <<: *compaction-base
-    container_name: ca_baseline
+    container_name: rule110_baseline
     command: baseline
 
   ablation:
     <<: *compaction-base
-    container_name: ca_ablation
+    container_name: rule110_ablation
     command: ablation
 
   report:
     <<: *compaction-base
-    container_name: ca_report
+    container_name: rule110_report
     command: report

@@ -1,38 +1,52 @@
 # Default experiment configuration
+# Rule-110 CA + Yosys + Cell-Based-Layout-Compaction framework
 
 experiment:
   name: demo
   seed: 42
   output_dir: outputs
 
-backend:
-  perl_script: vendor/cellCompaction.pl
-  default_iter: 5
-  default_xshrf: 0.9
-  default_yshrf: 0.9
-  timeout_seconds: 300
+# ── Yosys synthesis front-end ─────────────────────────────────────────────────
+synth:
+  yosys_bin:    yosys          # path or name on PATH
+  timeout:      300            # seconds
+  liberty_path: null           # set to .lib path for technology mapping
+  top_module:   null           # null = auto-detect
+  out_dir:      outputs/netlists
+  scripts_dir:  src/synth/scripts
 
-ca:
-  grid_resolution: 10        # grid units per layout unit
-  neighborhood: moore        # moore | vonneumann
-  max_epochs: 20
-  convergence_threshold: 0.01
-  rules_config: configs/ca_rules.yaml
-
+# ── Geometry construction ─────────────────────────────────────────────────────
 geometry:
+  cell_templates:    data/synth/cell_templates.yaml
   overlap_tolerance: 0
-  spacing_lambda: 1          # design rule spacing in lambda
+  spacing_lambda:    1
+  target_density:    0.65      # synthetic layout target occupancy
+
+# ── Rule-110 CA planner ───────────────────────────────────────────────────────
+ca:
+  engine:              rule110   # rule110 | composite (legacy)
+  grid_resolution:     10
+  rule110_config:      configs/rule110.yaml
+  rules_config:        configs/ca_rules.yaml   # legacy composite config
+
+# ── Backend compaction ────────────────────────────────────────────────────────
+backend:
+  perl_script:      vendor/cellCompaction.pl
+  default_iter:     5
+  default_xshrf:    0.9
+  default_yshrf:    0.9
+  timeout_seconds:  300
 
 benchmarks:
   config: configs/benchmarks.yaml
 
 viz:
-  dpi: 150
-  figure_format: png
-  font_size: 10
-  line_width: 1.0
+  dpi:              150
+  figure_format:    png
+  font_size:        10
+  line_width:       1.0
   white_background: true
 
 report:
   auto_update_readme: true
-  embed_figures: true
+  embed_figures:      true

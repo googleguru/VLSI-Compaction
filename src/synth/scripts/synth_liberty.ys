@@ -1,0 +1,19 @@
+# Yosys synthesis script — Liberty technology mapping
+# Usage: yosys -p "$(cat synth_liberty.ys)"
+# Variables expanded by YosysRunner before passing to yosys:
+#   ${INPUT_V}    input Verilog file
+#   ${OUTPUT_V}   output gate-level netlist
+#   ${LIBERTY}    path to .lib file
+#   ${TOP_FLAG}   e.g. "-top mymodule" or empty
+
+read_verilog ${INPUT_V}
+hierarchy -check ${TOP_FLAG}
+proc
+opt
+techmap
+opt
+dfflibmap -liberty ${LIBERTY}
+abc -liberty ${LIBERTY}
+opt -purge
+stat -liberty ${LIBERTY}
+write_verilog -noattr ${OUTPUT_V}
