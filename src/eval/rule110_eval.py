@@ -7,7 +7,9 @@ Runs one ablation policy over all available benchmarks:
 3. Runs the Rule-110 scheduler with the given policy.
 4. Extracts shrink factors via the planning layer.
 5. Calls the Perl compaction backend.
-6. Measures and returns CompactionMetrics.
+6. Exports .mag files (before/after) via MagWriter.
+7. Optionally runs Magic DRC on the compacted layout.
+8. Measures and returns CompactionMetrics.
 """
 
 import os
@@ -17,6 +19,7 @@ from typing import List
 
 from ..io.cif_reader import CIFReader
 from ..io.cif_writer import write_cif
+from ..io.mag_writer import write_mag_flat
 from ..io.benchmark_manifest import BenchmarkManifest
 from ..io.geometry_normalizer import normalize_layout
 from ..ca.grid_discretizer import GridDiscretizer
@@ -25,7 +28,9 @@ from ..planning.shrink_factor_planner import plan_shrink_factors
 from ..backend.perl_wrapper import PerlCompactor
 from ..geometry.overlap_estimator import count_bbox_overlaps, spacing_violations
 from ..geometry.spatial_metrics import bounding_box_area, layout_bboxes
+from ..layout.magic_runner import MagicRunner
 from .metrics_reporter import CompactionMetrics
+from .magic_drc_helper import drc_violations
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +55,13 @@ def run_rule110_eval(
         timeout     = config.get("backend", {}).get("timeout_seconds", 300),
     )
 
+    layout_cfg  = config.get("layout", {})
+    magic_tech  = layout_cfg.get("magic_tech", "scmos")
+    magic_runner = MagicRunner(
+        magic_bin = layout_cfg.get("magic_bin", "magic"),
+        tech      = magic_tech,
+    )
+
     sched_cfg = _policy_config(rule110_config, policy_name)
     scheduler = Rule110Scheduler(
         max_epochs  = sched_cfg.get("max_epochs",  20),
@@ -70,7 +82,7 @@ def run_rule110_eval(
         try:
             metrics = _run_one(
                 bm, config, policy_name, scheduler, discretizer,
-                reader, compactor, bm_out,
+                reader, compactor, magic_runner, magic_tech, bm_out,
             )
         except Exception as exc:
             logger.error("Rule110 eval failed [%s/%s]: %s", bm.name, policy_name, exc)
@@ -86,7 +98,7 @@ def run_rule110_eval(
 
 def _run_one(
     bm, config, policy_name, scheduler, discretizer,
-    reader, compactor, out_dir,
+    reader, compactor, magic_runner, magic_tech, out_dir,
 ) -> CompactionMetrics:
     t_start = time.perf_counter()
 
@@ -106,14 +118,22 @@ def _run_one(
     occ_ratio = float(grid.mean())
     xshrf, yshrf = plan_shrink_factors(run_result, occ_ratio)
 
-    # Backend compaction
+    # Write CIF and .mag (before)
     in_cif  = os.path.join(out_dir, f"{bm.name}_in.cif")
     out_cif = os.path.join(out_dir, f"{bm.name}_{policy_name}.cif")
     write_cif(layout_before, in_cif)
+    mag_dir = os.path.join(out_dir, "mag")
+    try:
+        write_mag_flat(layout_before,
+                       os.path.join(mag_dir, f"{bm.name}_before.mag"),
+                       tech=magic_tech)
+    except Exception as exc:
+        logger.debug("mag export (before) failed: %s", exc)
 
     backend_ok = False
     area_after, w_after, h_after = area_before, w_before, h_before
     bboxes_after = bboxes_before
+    layout_after = layout_before
     backend_iters = config.get("backend", {}).get("default_iter", 5)
 
     comp_result = compactor.compact(
@@ -131,6 +151,13 @@ def _run_one(
             w_after, h_after = _wh(layout_after)
             bboxes_after = layout_bboxes(layout_after)
             backend_ok   = True
+            # Export compacted .mag
+            try:
+                write_mag_flat(layout_after,
+                               os.path.join(mag_dir, f"{bm.name}_{policy_name}_after.mag"),
+                               tech=magic_tech)
+            except Exception as exc:
+                logger.debug("mag export (after) failed: %s", exc)
         except Exception as exc:
             logger.warning("Could not read compacted CIF: %s", exc)
 
@@ -142,31 +169,37 @@ def _run_one(
         return round((before - after) / before * 100, 2)
 
     sp_lam = config.get("geometry", {}).get("spacing_lambda", 1)
+    drc_cif = out_cif if backend_ok else in_cif
+    n_drc, magic_used = drc_violations(
+        drc_cif, bboxes_after, sp_lam, magic_runner, magic_tech
+    )
 
     return CompactionMetrics(
-        benchmark          = bm.name,
-        policy             = policy_name,
-        area_before        = area_before,
-        area_after         = area_after,
-        area_reduction_pct = _pct(area_before, area_after),
-        width_before       = w_before,
-        width_after        = w_after,
-        width_reduction_pct = _pct(w_before, w_after),
-        height_before      = h_before,
-        height_after       = h_after,
-        height_reduction_pct = _pct(h_before, h_after),
-        overlap_count_before = count_bbox_overlaps(bboxes_before),
-        overlap_count_after  = count_bbox_overlaps(bboxes_after),
-        spacing_violations   = spacing_violations(bboxes_after, sp_lam),
-        ca_epochs            = run_result.epochs_run,
-        ca_converged         = False,         # Rule 110 always runs full epochs
-        ca_planning_seconds  = round(ca_time, 3),
-        runtime_seconds      = round(total_time, 3),
-        xshrf                = xshrf,
-        yshrf                = yshrf,
-        backend_ok           = backend_ok,
-        iterations           = backend_iters,
-        notes                = "",
+        benchmark               = bm.name,
+        policy                  = policy_name,
+        area_before             = area_before,
+        area_after              = area_after,
+        area_reduction_pct      = _pct(area_before, area_after),
+        width_before            = w_before,
+        width_after             = w_after,
+        width_reduction_pct     = _pct(w_before, w_after),
+        height_before           = h_before,
+        height_after            = h_after,
+        height_reduction_pct    = _pct(h_before, h_after),
+        overlap_count_before    = count_bbox_overlaps(bboxes_before),
+        overlap_count_after     = count_bbox_overlaps(bboxes_after),
+        spacing_violations      = spacing_violations(bboxes_after, sp_lam),
+        magic_drc_violations    = n_drc if magic_used else -1,
+        magic_drc_available     = magic_used,
+        ca_epochs               = run_result.epochs_run,
+        ca_converged            = False,
+        ca_planning_seconds     = round(ca_time, 3),
+        runtime_seconds         = round(total_time, 3),
+        xshrf                   = xshrf,
+        yshrf                   = yshrf,
+        backend_ok              = backend_ok,
+        iterations              = backend_iters,
+        notes                   = "",
     )
 
 
@@ -176,7 +209,6 @@ def _wh(layout):
 
 
 def _policy_config(rule110_config: dict, policy_name: str) -> dict:
-    """Extract per-policy scheduler config from rule110.yaml."""
     ablations = rule110_config.get("ablations", {})
     if policy_name in ablations:
         return ablations[policy_name]

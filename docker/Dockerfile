@@ -10,6 +10,9 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Yosys and build dependencies
     yosys \
+    # Magic VLSI layout editor + Ghostscript for PS→PNG rendering
+    magic \
+    ghostscript \
     # Perl for Cell-Based-Layout-Compaction backend
     perl \
     perl-modules \
@@ -26,6 +29,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     libgd-dev \
     fonts-liberation \
+    # Magic runtime dependencies
+    tcl \
+    tk \
+    libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Perl modules ───────────────────────────────────────────────────────────
@@ -62,8 +69,9 @@ RUN mkdir -p vendor && \
 # ── Output directories ──────────────────────────────────────────────────────
 RUN mkdir -p outputs/{figures,compacted,compacted_layouts,tables,logs,reports,netlists,geometry}
 
-# ── Verify Yosys installation ───────────────────────────────────────────────
+# ── Verify tool installations ──────────────────────────────────────────────
 RUN yosys -version || echo "WARNING: yosys not available — synthesis will be skipped"
+RUN magic --version 2>/dev/null || echo "WARNING: magic not available — DRC/export will use fallback"
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
 CMD ["help"]

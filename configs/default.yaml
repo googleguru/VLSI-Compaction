@@ -47,6 +47,16 @@ viz:
   line_width:       1.0
   white_background: true
 
+# ── Magic VLSI layout integration ────────────────────────────────────────────
+layout:
+  magic_bin:    magic          # path or name on PATH
+  magic_tech:   scmos          # technology: scmos | sky130A | sky130B | gf180mcu
+  magic_timeout: 120           # seconds per Magic invocation
+  export_mag:   true           # write .mag files after compaction
+  export_gds:   false          # write GDS2 files (requires Magic)
+  drc_on_export: true          # run DRC when exporting .mag
+  render_magic:  false         # render Magic-style PNG figures (slow)
+
 report:
   auto_update_readme: true
   embed_figures:      true

@@ -1,13 +1,15 @@
 .PHONY: build docker-build synth compact baseline eval ablation report \
-        clean install lint test figures
+        clean install lint test figures drc gds-export render-magic
 
 PYTHON      := python3
 SCRIPTS     := scripts
 CONFIG      := configs/default.yaml
 R110_CONFIG := configs/rule110.yaml
 BENCHMARKS  := configs/benchmarks.yaml
+MAGIC_CFG   := configs/magic.yaml
 OUT         := outputs
 POLICY      ?= r110_alternating_adaptive
+TECH        ?= scmos
 
 # ── local environment ────────────────────────────────────────────────────────
 
@@ -79,11 +81,29 @@ figures:
 report:
 	bash $(SCRIPTS)/make_report.sh
 
+# ── Magic VLSI ───────────────────────────────────────────────────────────────
+
+drc:
+	bash $(SCRIPTS)/run_magic_drc.sh $(CONFIG) $(TECH)
+
+gds-export:
+	bash $(SCRIPTS)/export_gds.sh $(TECH) $(OUT)/compacted/gds
+
+render-magic:
+	$(PYTHON) -c "\
+import glob, os; \
+from src.io.cif_reader import read_cif; \
+from src.viz.layout_plotter import plot_magic_layout; \
+[plot_magic_layout(read_cif(f), tech='$(TECH)', \
+    out_path='$(OUT)/figures/' + os.path.splitext(os.path.basename(f))[0] + '_magic.png') \
+ for f in glob.glob('$(OUT)/compacted/*.cif')]"
+
 # ── cleanup ──────────────────────────────────────────────────────────────────
 
 clean:
 	rm -rf $(OUT)/figures/* $(OUT)/compacted/* $(OUT)/compacted_layouts/* \
 	       $(OUT)/tables/* $(OUT)/logs/* $(OUT)/reports/* \
 	       $(OUT)/netlists/* $(OUT)/geometry/* \
+	       $(OUT)/compacted/mag/* $(OUT)/compacted/gds/* \
 	       __pycache__ src/**/__pycache__ *.egg-info dist build
 	find . -name "*.pyc" -delete

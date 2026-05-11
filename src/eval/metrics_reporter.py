@@ -13,29 +13,32 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CompactionMetrics:
-    benchmark:            str
-    policy:               str
-    area_before:          int      = 0
-    area_after:           int      = 0
-    area_reduction_pct:   float    = 0.0
-    width_before:         int      = 0
-    width_after:          int      = 0
-    width_reduction_pct:  float    = 0.0
-    height_before:        int      = 0
-    height_after:         int      = 0
-    height_reduction_pct: float    = 0.0
-    overlap_count_before: int      = 0
-    overlap_count_after:  int      = 0
-    spacing_violations:   int      = 0
-    runtime_seconds:      float    = 0.0
-    iterations:           int      = 0
-    xshrf:                float    = 0.0
-    yshrf:                float    = 0.0
-    ca_epochs:            int      = 0
-    ca_converged:         bool     = False
-    backend_ok:           bool     = False
-    skip_reason:          str      = ""
-    notes:                str      = ""
+    benchmark:              str
+    policy:                 str
+    area_before:            int      = 0
+    area_after:             int      = 0
+    area_reduction_pct:     float    = 0.0
+    width_before:           int      = 0
+    width_after:            int      = 0
+    width_reduction_pct:    float    = 0.0
+    height_before:          int      = 0
+    height_after:           int      = 0
+    height_reduction_pct:   float    = 0.0
+    overlap_count_before:   int      = 0
+    overlap_count_after:    int      = 0
+    spacing_violations:     int      = 0
+    magic_drc_violations:   int      = -1   # -1 = Magic DRC not run
+    magic_drc_available:    bool     = False
+    runtime_seconds:        float    = 0.0
+    ca_planning_seconds:    float    = 0.0
+    iterations:             int      = 0
+    xshrf:                  float    = 0.0
+    yshrf:                  float    = 0.0
+    ca_epochs:              int      = 0
+    ca_converged:           bool     = False
+    backend_ok:             bool     = False
+    skip_reason:            str      = ""
+    notes:                  str      = ""
 
     @classmethod
     def skipped(cls, benchmark: str, policy: str, reason: str) -> "CompactionMetrics":
@@ -63,7 +66,8 @@ def write_markdown_table(metrics: List[CompactionMetrics], path: str) -> None:
     cols = [
         "benchmark", "policy",
         "area_reduction_pct", "width_reduction_pct", "height_reduction_pct",
-        "overlap_count_after", "runtime_seconds", "iterations", "backend_ok",
+        "overlap_count_after", "magic_drc_violations",
+        "runtime_seconds", "iterations", "backend_ok",
     ]
     header = "| " + " | ".join(cols) + " |"
     sep    = "| " + " | ".join(["---"] * len(cols)) + " |"
@@ -77,6 +81,8 @@ def write_markdown_table(metrics: List[CompactionMetrics], path: str) -> None:
                 cells.append(f"{v:.2f}")
             elif isinstance(v, bool):
                 cells.append("yes" if v else "no")
+            elif c == "magic_drc_violations" and v == -1:
+                cells.append("n/a")
             else:
                 cells.append(str(v))
         rows.append("| " + " | ".join(cells) + " |")

@@ -1,0 +1,109 @@
+# Magic VLSI technology-specific settings
+# Override individual values via --config or environment vars.
+#
+# Supported technologies:
+#   scmos    — built-in MOSIS SCMOS rules (always available in Magic)
+#   sky130A  — SkyWater 130nm open PDK  (requires sky130A PDK installed)
+#   sky130B  — SkyWater 130nm (alt PDK variant)
+#   gf180mcu — GlobalFoundries 180nm (requires gf180mcu PDK installed)
+
+default_tech: scmos
+
+technologies:
+
+  scmos:
+    magic_tech:    scmos
+    cif_scale:     100          # 1 lambda = 100 CIF centimicron units
+    mag_scale:     1            # 1 magic unit = 1 lambda
+    min_spacing:   1            # lambda
+    min_width:     1            # lambda
+    layer_aliases:
+      POLY:    poly
+      NDIFF:   ndiff
+      PDIFF:   pdiff
+      NWELL:   nwell
+      PWELL:   pwell
+      CONT:    contact
+      METAL1:  metal1
+      METAL2:  metal2
+      METAL3:  metal3
+      VIA1:    via
+      VIA2:    via2
+
+  sky130A:
+    magic_tech:    sky130A
+    cif_scale:     1            # CIF unit = 1 nm, magic unit = 5 nm → scale 5 for read
+    mag_scale:     5
+    min_spacing:   3            # 140nm in grid units (0.14 µm / 0.005 µm)
+    min_width:     3
+    layer_aliases:
+      POLY:    poly
+      NSD:     nsd
+      PSD:     psd
+      NWELL:   nwell
+      LICON:   licon
+      LI:      li
+      MCON:    mcon
+      MET1:    met1
+      VIA:     via
+      MET2:    met2
+      VIA2:    via2
+      MET3:    met3
+      VIA3:    via3
+      MET4:    met4
+      VIA4:    via4
+      MET5:    met5
+
+  sky130B:
+    magic_tech:    sky130B
+    cif_scale:     1
+    mag_scale:     5
+    min_spacing:   3
+    min_width:     3
+    layer_aliases:
+      POLY:    poly
+      NSD:     nsd
+      PSD:     psd
+      NWELL:   nwell
+      LICON:   licon
+      LI:      li
+      MCON:    mcon
+      MET1:    met1
+      VIA:     via
+      MET2:    met2
+
+  gf180mcu:
+    magic_tech:    gf180mcuC
+    cif_scale:     10           # 1 grid = 10nm; CIF unit = 1nm
+    mag_scale:     10
+    min_spacing:   2
+    min_width:     2
+    layer_aliases:
+      POLY:    poly2
+      NDIFF:   nplus
+      PDIFF:   pplus
+      NWELL:   nwell
+      CONT:    contact
+      METAL1:  metal1
+      VIA1:    via1
+      METAL2:  metal2
+      VIA2:    via2
+      METAL3:  metal3
+
+# DRC configuration
+drc:
+  run_after_compaction: true
+  fail_on_violations:   false   # set true to treat DRC failures as errors
+  max_violations:       0       # 0 = any violation is reported but not fatal
+
+# Export formats
+export:
+  mag:
+    enabled:   true
+    flat:      true             # write single flat .mag (easier for DRC)
+    hierarchical: false         # also write per-symbol .mag files
+  gds:
+    enabled:   false            # disabled by default; needs Magic available
+    compress:  false
+  cif:
+    enabled:   true             # always export CIF (native pipeline format)
